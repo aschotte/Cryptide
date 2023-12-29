@@ -13,7 +13,7 @@ class HexaCanvas(Canvas):
         self.hexaSize = number
     
     
-    def create_hexagone(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None):
+    def create_hexagone(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None, nolines=False):
         """ 
         Compute coordinates of 6 points relative to a center position.
         Point are numbered following this schema :
@@ -81,17 +81,19 @@ class HexaCanvas(Canvas):
             color5 = color
         if color6 == None:
             color6 = color
-    
-        self.create_line(point1, point2, fill=color1, width=5)
-        self.create_line(point2, point3, fill=color2, width=5)
-        self.create_line(point3, point4, fill=color3, width=5)
-        self.create_line(point4, point5, fill=color4, width=5)
-        self.create_line(point5, point6, fill=color5, width=5)
-        self.create_line(point6, point1, fill=color6, width=5)
+
+        if nolines is False:
+            self.create_line(point1, point2, fill=color1, width=5)
+            self.create_line(point2, point3, fill=color2, width=5)
+            self.create_line(point3, point4, fill=color3, width=5)
+            self.create_line(point4, point5, fill=color4, width=5)
+            self.create_line(point5, point6, fill=color5, width=5)
+            self.create_line(point6, point1, fill=color6, width=5)
     
         if fill != None:
-            self.create_polygon(point1, point2, point3, point4, point5, point6, fill=fill)
-    
+            return self.create_polygon(point1, point2, point3, point4, point5, point6, fill=fill)
+        else:
+            return None
     
     def create_triangle(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None):
 
@@ -148,6 +150,7 @@ class HexagonalGrid(HexaCanvas):
         self.setHexaSize(scale)
 
         self.elements = []
+        self.elts2del = []
     
     def setCell(self, xCell, yCell, idx=None, terrain=None, type=None, fill=None, *args, **kwargs ):
         """ Create a content in the cell of coordinates x and y. Could specify options throught keywords : color, fill, color1, color2, color3, color4; color5, color6"""
@@ -175,6 +178,8 @@ class HexagonalGrid(HexaCanvas):
         if type=='animal_ter':
             self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs)
             self.elements[idx-1]['ter']=terrain
+        if type=='sol':
+            self.elts2del.append(self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs))
         if type is None:
             self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs)
             self.elements.append({'id':idx,'type':terrain,'ter':None,'building':None,'center':[pix_x,pix_y]})
@@ -185,7 +190,7 @@ class Utils():
     def who_is_reversed(self):
         i=1
         L=[]
-        #q=int(input("how many reversed?"))
+        # q=int(input("how many reversed?"))
         q=4
         # for k in range (0,q):
         #     i=int(input("who is reversed?"))
@@ -217,15 +222,15 @@ class Utils():
     def loc2glob(self,i,j,gi,gj,sx,sy):
         return (i+gi*sx,j+gj*sy)
     
-    def building_positionning(self,objs):
-        u_objects={}
-        for obj in objs:
-            coord=input(str(obj)+" coordonates? (ex: 2,1 or 2,10 and None if none)")
-            if coord != "None":
-                coord=tuple(map(int, coord.split(',')))
-                g_idx=coord[1]+g2[coord[0]]*18
-                u_objects[g_idx]=obj
-        return u_objects
+    # def building_positionning(self,objs):
+    #     u_objects={}
+    #     for obj in objs:
+    #         coord=input(str(obj)+" coordonates? (ex: 2,1 or 2,10 and None if none)")
+    #         if coord != "None":
+    #             coord=tuple(map(int, coord.split(',')))
+    #             g_idx=coord[1]+g2[coord[0]]*18
+    #             u_objects[g_idx]=obj
+    #     return u_objects
 
 class Connectivity():
     def __init__(self):
@@ -536,10 +541,13 @@ class Research(Solve):
         return return_dic
 
     def maxlength(self, dico):
-        l=len(dico[list(dico.keys())[0]])
-        for k,v in dico.items():
-            if len(v)>l:
-                l=len(v)
+        if dico:
+            l=len(dico[list(dico.keys())[0]])
+            for k,v in dico.items():
+                if len(v)>l:
+                    l=len(v)
+        else:
+            l=0
         return l
     
     def collapse(self, l,research_dic,i=0):
@@ -552,20 +560,109 @@ class Research(Solve):
             return l
         return self.collapse(l,research_dic,i)
 
+class Building():
+    def __init__(self,objs):
+        self.objs=objs
+        self.buildings={}
+        self.counter=0
+
+class Evenements():
+    def __init__(self, tk):
+        self.tk=tk
+    def correct_quit(self,tk):
+        tk.destroy()
+        tk.quit()
+    def add_building(self,event,build):
+        x, y = event.x, event.y
+        dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
+        el_init=elements[0]['id']
+        for el in elements:
+            center=el['center']
+            dist=(x-center[0])**2 + (y-center[1])**2
+            if dist<dist_init:
+                dist_init=dist
+                el_init=el['id']
+        if build.counter<len(build.objs):
+            build.buildings[el_init]=build.objs[build.counter]
+            #euclidian division
+            q=el_init//18 #global positionning
+            r=el_init%18 #local positionning
+            if r==0:
+                r=18
+                q-=1
+            coord=glob2coord[q]
+            idx_loc=loc2coord[r]
+            idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+            grid.setCell(idx_glob[0],idx_glob[1],idx=el_init, type=build.objs[build.counter]['shape'],size=40, fill=build.objs[build.counter]['color'])
+        else:
+            print('No more buildings to put!')
+        build.counter+=1
+    def motion(self,event):
+        x, y = event.x, event.y
+        dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
+        el_init=elements[0]['id']
+        for el in elements:
+            center=el['center']
+            dist=(x-center[0])**2 + (y-center[1])**2
+            if dist<dist_init:
+                dist_init=dist
+                el_init=el['id']
+
+        label=Label(tk,text=str(el_init),bg="white",borderwidth=1)
+        label.grid(row=2, column=1, padx=5, pady=5)
+
+class DisplaySolve(Solve):
+    def __init__(self):
+        self.label=Label(tk,text='',bg="white",borderwidth=1)
+        self.has_solved=False
+    def solve(self,event,elements,c,*args,**kwargs):
+        ens=Ensembles(elements,c)
+        coord=reponse.get()
+        coord=tuple(map(int, coord.split(',')))
+        p=coord[0]
+        s=Solve(ens.ensembles, p=p, clue=coord[1], **kwargs)
+        s.solve()
+
+        for elt in grid.elts2del:
+            grid.delete(elt)
+
+        # if self.has_solved:
+        #     self.label.destroy()
+        #     self.label=Label(tk,text=str(s.res),bg="white",borderwidth=1)
+        #     self.label.grid(row=0, column=0)
+        # else:
+        #     self.label=Label(tk,text=str(s.res),bg="white",borderwidth=1)
+        #     self.label.grid(row=0, column=0)
+        #     self.has_solved=True
+        print('result: '+str(s.res))
+        print('#')
+        print('#')
+
+        for k,v in s.res.items():
+            q=k//18 #global positionning
+            r=k%18 #local positionning
+            if r==0:
+                r=18
+                q-=1
+            coord=glob2coord[q]
+            idx_loc=loc2coord[r]
+            idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+            grid.setCell(idx_glob[0],idx_glob[1],size=20,type='sol', fill='red', nolines=True)
+
+        r=Research(ens.ensembles, s.res, c_num=3)
+        print(r.buffer_res)
+
 
 if __name__ == "__main__":
     tk = Tk()
-
     grid = HexagonalGrid(tk, scale = 50, grid_width=2*6, grid_height=3*4)
     grid.grid(row=1, column=0, padx=5, pady=5)
-
     u=Utils()
 
-    def correct_quit(tk):
-        tk.destroy()
-        tk.quit()
+    #evenements
+    e=Evenements(tk)
 
-    quit = Button(tk, text = "Quit", command = lambda :correct_quit(tk))
+    quit = Button(tk, text = "Quit", command = lambda :e.correct_quit(tk))
     quit.grid(row=2, column=0)
 
     #Create Types
@@ -606,7 +703,7 @@ if __name__ == "__main__":
         for i in range(0,3):
             for j in range(0,6):
                 idx_glob=u.loc2glob(i,j,glob2coord[pos][0],glob2coord[pos][1],3,6)
-                print(type2color[types[id][inc]])
+                #print(type2color[types[id][inc]])
                 grid.setCell(idx_glob[0],idx_glob[1],idx=coord2loc[(i,j)]+18*pos,terrain=types[id][inc],fill=type2color[types[id][inc]])
                 inc+=1
 
@@ -636,64 +733,26 @@ if __name__ == "__main__":
     greenhex={"shape":"hex", "color":"green"}
     blacktri={"shape":"tri", "color":"black"}
     blackhex={"shape":"hex", "color":"black"}
-    objs=[bluetri,bluehex,whitetri,whitehex,greentri,greenhex,blacktri,blackhex]
-    #objs=[bluehex]
-    #buildings=u.building_positionning(objs)
-    #print(buildings)
-    buildings={74: {'shape': 'tri', 'color': 'blue'}, 2: {'shape': 'hex', 'color': 'blue'}, 45: {'shape': 'tri', 'color': 'white'}, 
-               54: {'shape': 'hex', 'color': 'white'}, 66: {'shape': 'tri', 'color': 'green'}, 61: {'shape': 'hex', 'color': 'green'}}
+    objs_easy=[bluetri,bluehex,whitetri,whitehex,greentri,greenhex]
+    objs_hard=[bluetri,bluehex,whitetri,whitehex,greentri,greenhex,blacktri,blackhex]
 
-    #building positionning
-    for g_idx, obj in buildings.items():
-        #euclidian division
-        q=g_idx//18 #global positionning
-        r=g_idx%18 #local positionning
-        if r==0:
-            r=18
-            q-=1
-        coord=glob2coord[q]
-        idx_loc=loc2coord[r]
-        idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
-        grid.setCell(idx_glob[0],idx_glob[1],idx=g_idx, type=obj['shape'],size=40, fill=obj['color'])
+    #build=Building(objs_hard)
+    build=Building(objs_easy)
+    tk.bind('<Button-1>',lambda event:e.add_building(event,build))
 
+    #motion of mouse
+    tk.bind('<Motion>', e.motion)
 
-    root = tk
-
+    #get dico of all hexas
     elements=grid.elements
-    #print(elements)
 
-    def motion(event):
-        x, y = event.x, event.y
-        dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
-        el_init=elements[0]['id']
-        for el in elements:
-            center=el['center']
-            dist=(x-center[0])**2 + (y-center[1])**2
-            if dist<dist_init:
-                dist_init=dist
-                el_init=el['id']
-
-        #print('{}, {}'.format(el_init, dist_init))
-        #print('{}, {}'.format(x, y))
-        label=Label(tk,text=str(el_init),bg="white",borderwidth=1)
-        label.grid(row=2, column=1, padx=5, pady=5)
-    tk.bind('<Motion>', motion)
-    
-
+    #create connectivity
     c=Connectivity()
-    ens=Ensembles(elements,c)
-    print(ens.ensembles)
-
-    s=Solve(ens.ensembles, p=3, clue=23)
-    s.solve()
-    label=Label(tk,text=str(s.res),bg="white",borderwidth=1)
-    label.grid(row=0, column=0)
-
-    r=Research(ens.ensembles, s.res, c_num=3)
-    label=Label(tk,text=str(r.buffer_res),bg="white",borderwidth=1)
-    label.grid(row=1, column=1)
-    #print(s.res)
     
-    #grid.setCell(0,0, fill='blue')
+    reponse = Entry(tk)
+    reponse.grid(row=1, column=1, pady=5, padx=5)
+    dsolve=DisplaySolve()
+    reponse.bind("<Return>", lambda event:dsolve.solve(event, elements, c))
+    
 
     tk.mainloop()
