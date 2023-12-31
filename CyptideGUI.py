@@ -13,7 +13,7 @@ class HexaCanvas(Canvas):
         self.hexaSize = number
     
     
-    def create_hexagone(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None, nolines=False):
+    def create_hexagone(self, x, y, return_lines=False, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None, nolines=False):
         """ 
         Compute coordinates of 6 points relative to a center position.
         Point are numbered following this schema :
@@ -83,19 +83,22 @@ class HexaCanvas(Canvas):
             color6 = color
 
         if nolines is False:
-            self.create_line(point1, point2, fill=color1, width=5)
-            self.create_line(point2, point3, fill=color2, width=5)
-            self.create_line(point3, point4, fill=color3, width=5)
-            self.create_line(point4, point5, fill=color4, width=5)
-            self.create_line(point5, point6, fill=color5, width=5)
-            self.create_line(point6, point1, fill=color6, width=5)
-    
-        if fill != None:
-            return self.create_polygon(point1, point2, point3, point4, point5, point6, fill=fill)
+            l1=self.create_line(point1, point2, fill=color1, width=5)
+            l2=self.create_line(point2, point3, fill=color2, width=5)
+            l3=self.create_line(point3, point4, fill=color3, width=5)
+            l4=self.create_line(point4, point5, fill=color4, width=5)
+            l5=self.create_line(point5, point6, fill=color5, width=5)
+            l6=self.create_line(point6, point1, fill=color6, width=5)
+
+        if return_lines:
+            return [l1,l2,l3,l4,l5,l6]
         else:
-            return None
+            if fill != None:
+                return self.create_polygon(point1, point2, point3, point4, point5, point6, fill=fill)
+            else:
+                return None
     
-    def create_triangle(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None):
+    def create_triangle(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, nolines=False):
 
         if size is None:
             size = self.hexaSize
@@ -117,23 +120,55 @@ class HexaCanvas(Canvas):
         if color3 == None:
             color3 = color
     
-        self.create_line(point1, point2, fill=color1, width=5)
-        self.create_line(point2, point3, fill=color2, width=5)
-        self.create_line(point3, point1, fill=color3, width=5)
+        if nolines is False:    
+            l1=self.create_line(point1, point2, fill=color1, width=5)
+            l2=self.create_line(point2, point3, fill=color2, width=5)
+            l3=self.create_line(point3, point1, fill=color3, width=5)
     
         if fill != None:
-            self.create_polygon(point1, point2, point3, fill=fill)
+            #print(self.create_polygon(point1, point2, point3, fill=fill))
+            return [self.create_polygon(point1, point2, point3, fill=fill),l1,l2,l3]
     
-    def create_octogone(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None):
+    def create_cube(self, x, y, size=None, color = "black", fill="blue", color1=None, color2=None, color3=None, color4=None):
+
+        if size is None:
+            size = self.hexaSize
+
+        s=size/2
+
+        point1 = (x-s,y-s)
+        point2 = (x-s, y+s)
+        point3 = (x+s, y+s)
+        point4 = (x+s, y-s)
+    
+        #this setting allow to specify a different color for each side.
+        if color1 == None:
+            color1 = color
+        if color2 == None:
+            color2 = color
+        if color3 == None:
+            color3 = color
+        if color4 == None:
+            color4 = color
+      
+        l1=self.create_line(point1, point2, fill=color1, width=5)
+        l2=self.create_line(point2, point3, fill=color2, width=5)
+        l3=self.create_line(point3, point4, fill=color3, width=5)
+        l4=self.create_line(point4, point1, fill=color3, width=5)
+    
+        if fill != None:
+            return [self.create_polygon(point1, point2, point3, point4, fill=fill),l1,l2,l3,l4]
+
+    def create_octogone(self, x, y, size=None, fill="blue", color1=None, color2=None, color3=None, color4=None, color5=None, color6=None, nolines=False):
         """I cheese it into a circle"""
         def create_circle(x, y, r, **kwargs): #center coordinates, radius
             x0 = x - r
             y0 = y - r
             x1 = x + r
             y1 = y + r
-            return self.create_oval(x0, y0, x1, y1, width=5, **kwargs)
-    
-        create_circle(x, y, 15, fill=fill)
+            return self.create_oval(x0, y0, x1, y1, width=5,**kwargs)
+        c=create_circle(x, y, 15, fill=fill)
+        return [c]
 
 
 class HexagonalGrid(HexaCanvas):
@@ -151,6 +186,7 @@ class HexagonalGrid(HexaCanvas):
 
         self.elements = []
         self.elts2del = []
+        self.cubes =[]
     
     def setCell(self, xCell, yCell, idx=None, terrain=None, type=None, fill=None, *args, **kwargs ):
         """ Create a content in the cell of coordinates x and y. Could specify options throught keywords : color, fill, color1, color2, color3, color4; color5, color6"""
@@ -171,18 +207,29 @@ class HexagonalGrid(HexaCanvas):
         pix_x = size + yCell*1.5*size + 5
 
         if type=='hex':
-            self.create_octogone(pix_x, pix_y, fill=fill,*args, **kwargs)
-            self.elements[idx-1]['building']={'shape':type,'color':fill}
+            if idx is not None:
+                self.elements[idx-1]['building']={'shape':type,'color':fill}
+            return self.create_octogone(pix_x, pix_y, fill=fill,*args, **kwargs)
         if type=='tri':
-            self.create_triangle(pix_x, pix_y, fill=fill,*args, **kwargs)
+            if idx is not None:
+                self.elements[idx-1]['building']={'shape':type,'color':fill}
+            return self.create_triangle(pix_x, pix_y, fill=fill,*args, **kwargs)
+
         if type=='animal_ter':
             self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs)
             self.elements[idx-1]['ter']=terrain
         if type=='sol':
             self.elts2del.append(self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs))
+        if type=='ens':
+            self.elts2del.append(self.create_hexagone(pix_x, pix_y, return_lines=True, fill=fill,*args, **kwargs))
         if type is None:
             self.create_hexagone(pix_x, pix_y, fill=fill,*args, **kwargs)
             self.elements.append({'id':idx,'type':terrain,'ter':None,'building':None,'center':[pix_x,pix_y]})
+        
+        if type=='cube':
+            if idx is not None:
+                self.elements[idx-1]['cube']={'shape':type,'color':fill}
+            return self.create_cube(pix_x, pix_y, fill=fill,*args, **kwargs)
 
 
 class Utils():
@@ -190,12 +237,12 @@ class Utils():
     def who_is_reversed(self):
         i=1
         L=[]
-        # q=int(input("how many reversed?"))
-        q=4
-        # for k in range (0,q):
-        #     i=int(input("who is reversed?"))
-        #     L.append(i)
-        L=[4,3,1,6]
+        q=int(input("how many reversed?"))
+        #q=4
+        for k in range (0,q):
+            i=int(input("who is reversed?"))
+            L.append(i)
+        #L=[4,3,1,6]
         return L
     def reverseconfig(self, types, ters):
         L=self.who_is_reversed()
@@ -211,12 +258,12 @@ class Utils():
     def global_positionning(self):
         d={}
         D={}
-        # for i in range (0,6):
-        #     k=int(input("who is in position "+str(i)+" ?"))
-        #     d[i]=k
-        #     D[k]=i
-        d={0:4, 1:3, 2:5, 3:2, 4:1, 5:6}
-        D={1:4, 2:3, 3:1, 4:0, 5:2, 6:5}
+        for i in range (0,6):
+            k=int(input("who is in position "+str(i)+" ?"))
+            d[i]=k
+            D[k]=i
+        #d={0:4, 1:3, 2:5, 3:2, 4:1, 5:6}
+        #D={1:4, 2:3, 3:1, 4:0, 5:2, 6:5}
         return d, D
     
     def loc2glob(self,i,j,gi,gj,sx,sy):
@@ -462,8 +509,18 @@ class Solve():
                             #print(intersect2)
                             if len(intersect2)==1:
                                 if intersect2[0] not in self.res:
-                                    self.res[intersect2[0]]={'known_clue':self.clue, 'unknown_clue_1':key, 'unknown_clue_2':k}
-
+                                    #res[intersect2[0]]={'known_clue':clue, 'unknown_clue_1':key, 'unknown_clue_2':k}
+                                    self.res[intersect2[0]]=[]
+                                    t=[key, k]
+                                    t.sort()
+                                    if t not in self.res[intersect2[0]]:
+                                        self.res[intersect2[0]].append(t)
+                                else:
+                                    t=[key, k]
+                                    t.sort()
+                                    if t not in self.res[intersect2[0]]:
+                                        self.res[intersect2[0]].append(t)
+                                    
         if self.p==4:
             for key, value in self.ens.items():
                 if self.ens[self.clue]!=value:
@@ -476,7 +533,23 @@ class Solve():
                                     intersect3=self.intersection(intersect2, n)
                                     if len(intersect3)==1:
                                         if intersect3[0] not in self.res:
-                                            self.res[intersect3[0]]={'known_clue':self.clue, 'unknown_clue_1':key, 'unknown_clue_2':k, 'unknown_clue_3':b}
+                                            self.res[intersect3[0]]=[]
+                                            t=[key, k, b]
+                                            t = list(set(t))
+                                            if len(t)!=3:
+                                                continue
+                                            t.sort()
+                                            if t not in self.res[intersect3[0]]:
+                                                self.res[intersect3[0]].append(t)
+                                        else:
+                                            #res[intersect3[0]].append({'known_clue':clue, 'unknown_clue_1':key, 'unknown_clue_2':k, 'unknown_clue_3':b})
+                                            t=[key, k, b]
+                                            t = list(set(t))
+                                            if len(t)!=3:
+                                                continue
+                                            t.sort()
+                                            if t not in self.res[intersect3[0]]:
+                                                self.res[intersect3[0]].append(t)
         if self.p==5:
             print('not yet implemented')
 
@@ -491,26 +564,35 @@ class Solve():
 
 
 class Research(Solve):
-    def __init__(self, ens, res, c_num=2):
+    def __init__(self, ens, res, imp_clues, c_num=2):
         self.count=self.counter(res)
         research_dic={}
         for key, value in self.count.items():
             research_dic[key]=ens[key]
         self.research_dic=research_dic
 
-        self.adv_res, self.buffer_res=self.advanced_research(c_num=c_num)
+        #self.adv_res, self.buffer_res=self.advanced_research(c_num=c_num)
 
-    def advanced_research(self, c_num=2):
+        poss_clues=self.possible_clues(imp_clues,ens)
+        dic_of_colors={}
+        for k, clue_list in poss_clues.items():
+            research_dic_color={}
+            for clue in clue_list:
+                research_dic_color[clue]=ens[clue]
+            dic_of_colors[k]=research_dic_color
+        self.dic_of_colors=dic_of_colors
+
+    def advanced_research(self, research_dic, c_num):
         adv_res={}
-        perm=permutations(self.research_dic, c_num)
+        perm=permutations(research_dic, c_num)
         
-        long=self.maxlength(self.research_dic)
+        long=self.maxlength(research_dic)
         pbuffer=0
         Lbuffer=[]
         for p in list(perm):
             small_dic={}
             for s in list(p):
-                small_dic[s]=self.research_dic[s]
+                small_dic[s]=research_dic[s]
             l=small_dic[list(small_dic.keys())[0]]
             L=self.collapse(l,small_dic)
             if len(L)<long and len(L)>0:
@@ -524,21 +606,32 @@ class Research(Solve):
     
         return adv_res, buffer_res
     
-    def counter(self, res):
-        dico_compter={}
-        for key, value in res.items():
-            for k,v in value.items():
-                if 'unknown' in k:
-                    if v not in dico_compter:
-                        dico_compter[v]=1
+    def dico2ask(self,cube_percol):
+        dico2ask={}
+        for color in list(cube_percol.keys()):
+            research_dic_color=self.dic_of_colors[color]
+            c_num=1
+            
+            dico_adv, buffer = self.advanced_research(research_dic_color, c_num)
+            while len(buffer['list'])>1 and c_num+1<len(research_dic_color):
+                #print(c_num)
+                c_num+=1
+                dico_adv, buffer= self.advanced_research(research_dic_color, c_num)
+            dico2ask[color]=buffer
+        print(dico2ask)
+
+    def possible_clues(self, imp_clues, ens):
+        dico={}
+        for color, clue_list in imp_clues.items():
+            for clue in list(ens.keys()):
+                if clue not in clue_list:
+                    if color in dico:
+                        dico[color].append(clue)
+                        dico[color].sort()
                     else:
-                        dico_compter[v]+=1
-        l=sorted(dico_compter.items(), key=lambda x:x[1], reverse=True)
-        return_dic={}
-        for elt in l:
-            return_dic[elt[0]]=elt[1]
-        
-        return return_dic
+                        dico[color]=[clue]
+                    
+        return dico
 
     def maxlength(self, dico):
         if dico:
@@ -559,6 +652,21 @@ class Research(Solve):
         if len(l)<=1:
             return l
         return self.collapse(l,research_dic,i)
+    def counter(self, res):
+        dico_compter={}
+        for key, value in res.items():
+            for t in value:
+                for clue in t:
+                    if clue in dico_compter:
+                        dico_compter[clue]+=1
+                    else:
+                        dico_compter[clue]=1
+        l=sorted(dico_compter.items(), key=lambda x:x[1], reverse=True)
+        return_dic={}
+        for elt in l:
+            return_dic[elt[0]]=elt[1]
+            
+        return return_dic
 
 class Building():
     def __init__(self,objs):
@@ -566,6 +674,22 @@ class Building():
         self.buildings={}
         self.counter=0
 
+        self.currdisplay=[]
+        self.display()
+
+    def display(self):
+        self.currdisplay=grid.setCell(5,13, type=self.objs[self.counter]['shape'],size=40, fill=self.objs[self.counter]['color'])
+    
+    def destroydisplay(self):
+        for elt in self.currdisplay:
+            grid.delete(elt)
+
+class Cubes():
+    def __init__(self,cubes):
+        self.cubes=cubes
+        self.cube_dico={}
+        self.counter=0
+        
 class Evenements():
     def __init__(self, tk):
         self.tk=tk
@@ -573,6 +697,10 @@ class Evenements():
         tk.destroy()
         tk.quit()
     def add_building(self,event,build):
+
+        build.destroydisplay()
+
+        #--------
         x, y = event.x, event.y
         dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
         el_init=elements[0]['id']
@@ -582,6 +710,7 @@ class Evenements():
             if dist<dist_init:
                 dist_init=dist
                 el_init=el['id']
+        #--------
         if build.counter<len(build.objs):
             build.buildings[el_init]=build.objs[build.counter]
             #euclidian division
@@ -597,6 +726,51 @@ class Evenements():
         else:
             print('No more buildings to put!')
         build.counter+=1
+        if build.counter<len(build.objs):
+            build.display()
+    
+    def add_cubes(self,event,build):
+        #--------
+        x, y = event.x, event.y
+        dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
+        el_init=elements[0]['id']
+        for el in elements:
+            center=el['center']
+            dist=(x-center[0])**2 + (y-center[1])**2
+            if dist<dist_init:
+                dist_init=dist
+                el_init=el['id']
+        #--------
+        if build.counter<len(build.cubes):
+            build.cube_dico[el_init]=build.cubes[build.counter]
+            #euclidian division
+            q=el_init//18 #global positionning
+            r=el_init%18 #local positionning
+            if r==0:
+                r=18
+                q-=1
+            coord=glob2coord[q]
+            idx_loc=loc2coord[r]
+            idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+            grid.setCell(idx_glob[0],idx_glob[1],idx=el_init, type=build.cubes[build.counter]['shape'],size=15, fill=build.cubes[build.counter]['color'])
+            
+        else:
+            build.counter=0
+            build.cube_dico[el_init]=build.cubes[build.counter]
+            #euclidian division
+            q=el_init//18 #global positionning
+            r=el_init%18 #local positionning
+            if r==0:
+                r=18
+                q-=1
+            coord=glob2coord[q]
+            idx_loc=loc2coord[r]
+            idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+            grid.setCell(idx_glob[0],idx_glob[1],idx=el_init, type=build.cubes[build.counter]['shape'],size=15, fill=build.cubes[build.counter]['color'])
+        build.counter+=1
+        #print(build.cube_dico)
+        #print(grid.elements)
+
     def motion(self,event):
         x, y = event.x, event.y
         dist_init=(x-elements[0]['center'][0])**2 + (y-elements[0]['center'][1])**2
@@ -615,47 +789,115 @@ class DisplaySolve(Solve):
     def __init__(self):
         self.label=Label(tk,text='',bg="white",borderwidth=1)
         self.has_solved=False
-    def solve(self,event,elements,c,*args,**kwargs):
+    def solve(self,event,elements,cubes,c,*args,**kwargs):
         ens=Ensembles(elements,c)
         coord=reponse.get()
         coord=tuple(map(int, coord.split(',')))
-        p=coord[0]
-        s=Solve(ens.ensembles, p=p, clue=coord[1], **kwargs)
-        s.solve()
-
         for elt in grid.elts2del:
-            grid.delete(elt)
+                if(isinstance(elt,list)):
+                    for id in elt:
+                        grid.delete(id)
+                else:
+                    grid.delete(elt)
+        #display clue
+        if coord[1]==0:
+            
+            for k in ens.ensembles[coord[0]]:
+                q=k//18 #global positionning
+                r=k%18 #local positionning
+                if r==0:
+                    r=18
+                    q-=1
+                coord=glob2coord[q]
+                idx_loc=loc2coord[r]
+                idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+                grid.setCell(idx_glob[0],idx_glob[1],size=48,type='ens', fill=None, color1='white',color2='white',color3='white',color4='white',color5='white',color6='white')
+        #solve and display
+        else: 
+            p=coord[0]
+            s=Solve(ens.ensembles, p=p, clue=coord[1], **kwargs)
+            s.solve()
+            if cubes != {}:
+                corr_res=self.correct_sol(s.res, ens.ensembles, cubes)
+            else:
+                corr_res=s.res
 
-        # if self.has_solved:
-        #     self.label.destroy()
-        #     self.label=Label(tk,text=str(s.res),bg="white",borderwidth=1)
-        #     self.label.grid(row=0, column=0)
-        # else:
-        #     self.label=Label(tk,text=str(s.res),bg="white",borderwidth=1)
-        #     self.label.grid(row=0, column=0)
-        #     self.has_solved=True
-        print('result: '+str(s.res))
-        print('#')
-        print('#')
+            for cube in list(cubes.keys()):
+                if cube in corr_res:
+                    del corr_res[cube]
 
-        for k,v in s.res.items():
-            q=k//18 #global positionning
-            r=k%18 #local positionning
-            if r==0:
-                r=18
-                q-=1
-            coord=glob2coord[q]
-            idx_loc=loc2coord[r]
-            idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
-            grid.setCell(idx_glob[0],idx_glob[1],size=20,type='sol', fill='red', nolines=True)
+            print('result: '+str(corr_res))
+            print('#')
+            print('#')
 
-        r=Research(ens.ensembles, s.res, c_num=3)
-        print(r.buffer_res)
+            for k,v in corr_res.items():
+                q=k//18 #global positionning
+                r=k%18 #local positionning
+                if r==0:
+                    r=18
+                    q-=1
+                coord=glob2coord[q]
+                idx_loc=loc2coord[r]
+                idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
+                grid.setCell(idx_glob[0],idx_glob[1],size=20,type='sol', fill='red', nolines=True)
+            
+            imp_clues=self.impossible_clues(self.get_cubepos_bycolor(cubes), ens.ensembles)
+            r=Research(ens.ensembles, s.res, imp_clues, c_num=3)
+            r.dico2ask(self.get_cubepos_bycolor(cubes))
+            #print(r.buffer_res)
+    def get_cubepos_bycolor(self, cubes):
+        dico={}
+        for k,v in cubes.items():
+            if v['color'] in dico:
+                dico[v['color']].append(k)
+            else:
+                dico[v['color']]=[k]
+        return dico
+    ###impossible clues per color
+    def impossible_clues(self, cube_percol, ens):
+        dico={}
+        for color, elt_list in cube_percol.items():
+            for elt in elt_list:
+                for clue,ensemble in ens.items():
+                    if elt in ensemble:
+                        if color in dico:
+                            if clue not in dico[color]:
+                                dico[color].append(clue)
+                                dico[color].sort()
+                        else:
+                            dico[color]=[clue]
+        return dico
+    #do not use your own clue!!
+    def check_if_false(self, clue, imp_clues):
+        count=0
+        for color, clue_list in imp_clues.items():
+            if clue in clue_list:
+                count+=1
+        
+        c=len(imp_clues)-count
+        if c==0:
+            return True
+        else:
+            return False
+    def correct_sol(self, res, ens, cubes):
+        cube_percol=self.get_cubepos_bycolor(cubes)
+        imp_clues=self.impossible_clues(cube_percol, ens)
+        res_loop=res.copy()
+        for sol, tupl_list in res_loop.items():
+            tupl_list_loop=tupl_list.copy()
+            for tupl in tupl_list_loop:
+                for clue in tupl:
+                    if self.check_if_false(clue, imp_clues):
+                        if tupl in res[sol]:
+                            res[sol].remove(tupl)
+            if res[sol]==[]:
+                del res[sol]
+        return res
 
 
 if __name__ == "__main__":
     tk = Tk()
-    grid = HexagonalGrid(tk, scale = 50, grid_width=2*6, grid_height=3*4)
+    grid = HexagonalGrid(tk, scale = 50, grid_width=2*6, grid_height=3*3.8)
     grid.grid(row=1, column=0, padx=5, pady=5)
     u=Utils()
 
@@ -749,10 +991,26 @@ if __name__ == "__main__":
     #create connectivity
     c=Connectivity()
     
+    #user input to add cubes
+    orangecube={"shape":"cube", "color":"orange"}
+    redcube={"shape":"cube", "color":"red"}
+    cyancube={"shape":"cube", "color":"dark cyan"}
+    lbluecube={"shape":"cube", "color":"light blue"}
+    purplecube={"shape":"cube", "color":"purple"}
+    cubes=[orangecube,redcube,cyancube,lbluecube,purplecube]
+    cubes=Cubes(cubes)
+    tk.bind('<Button-3>',lambda event:e.add_cubes(event,cubes))
+
+    #get dico of cubes
+    cubes_dico=cubes.cube_dico
+
+    #user input solve or display one ensemble
     reponse = Entry(tk)
     reponse.grid(row=1, column=1, pady=5, padx=5)
     dsolve=DisplaySolve()
-    reponse.bind("<Return>", lambda event:dsolve.solve(event, elements, c))
+    reponse.bind("<Return>", lambda event:dsolve.solve(event, elements, cubes_dico, c))
+
     
+
 
     tk.mainloop()
