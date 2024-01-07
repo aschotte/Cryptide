@@ -230,6 +230,11 @@ class HexagonalGrid(HexaCanvas):
             if idx is not None:
                 self.elements[idx-1]['cube']={'shape':type,'color':fill}
             return self.create_cube(pix_x, pix_y, fill=fill,*args, **kwargs)
+        
+        if type=='circle':
+            if idx is not None:
+                self.elements[idx-1]['circle']={'shape':type,'color':fill}
+            return self.create_octogone(pix_x, pix_y, fill=fill,*args, **kwargs)
 
 
 class Utils():
@@ -564,7 +569,7 @@ class Solve():
 
 
 class Research(Solve):
-    def __init__(self, ens, res, imp_clues, c_num=2):
+    def __init__(self, ens, res, imp_clues):
         self.count=self.counter(res)
         research_dic={}
         for key, value in self.count.items():
@@ -578,7 +583,8 @@ class Research(Solve):
         for k, clue_list in poss_clues.items():
             research_dic_color={}
             for clue in clue_list:
-                research_dic_color[clue]=ens[clue]
+                if clue in self.count:
+                    research_dic_color[clue]=ens[clue]
             dic_of_colors[k]=research_dic_color
         self.dic_of_colors=dic_of_colors
 
@@ -605,20 +611,54 @@ class Research(Solve):
         buffer_res={'clues':pbuffer,'list':Lbuffer, 'long':long}
     
         return adv_res, buffer_res
-    
+    #nice print of dico2ask
+    def nice_print(self,dico):
+        for key, el in dico.items():
+            print(key)
+            for e in el:
+                print(e)
+            print('#')
+            print('#')
     def dico2ask(self,cube_percol):
+        # dico2ask={}
+        # for color in list(cube_percol.keys()):
+        #     research_dic_color=self.dic_of_colors[color]
+        #     c_num=1
+            
+        #     dico_adv, buffer = self.advanced_research(research_dic_color, c_num)
+        #     while len(buffer['list'])>1 and c_num+1<len(research_dic_color):
+        #         #print(c_num)
+        #         c_num+=1
+        #         dico_adv, buffer= self.advanced_research(research_dic_color, c_num)
+        #     dico2ask[color]=buffer
+        # print(dico2ask)
         dico2ask={}
         for color in list(cube_percol.keys()):
             research_dic_color=self.dic_of_colors[color]
-            c_num=1
-            
-            dico_adv, buffer = self.advanced_research(research_dic_color, c_num)
-            while len(buffer['list'])>1 and c_num+1<len(research_dic_color):
-                #print(c_num)
-                c_num+=1
-                dico_adv, buffer= self.advanced_research(research_dic_color, c_num)
-            dico2ask[color]=buffer
-        print(dico2ask)
+
+            while len(research_dic_color)>1:
+                c_num=1
+                dico_adv, buffer = self.advanced_research(research_dic_color, c_num)
+                while len(buffer['list'])>1 and c_num<len(research_dic_color) and c_num<5:
+                    #print(c_num)
+                    dico_adv, buffer= self.advanced_research(research_dic_color, c_num)
+                    c_num+=1
+                if color not in dico2ask:
+                    dico2ask[color]=[buffer]
+                else:
+                    dico2ask[color].append(buffer)
+                clues2del=buffer['clues']
+                if clues2del!=0:
+                    #print(clues2del)
+                    for clue in clues2del:
+                        del research_dic_color[clue]
+                #print(len(research_dic_color))
+            if len(research_dic_color)==1:
+                if color not in dico2ask:
+                    dico2ask[color]=[{'clues':list(research_dic_color.keys())[0], 'list':research_dic_color[list(research_dic_color.keys())[0]]}]
+                else:
+                    dico2ask[color].append({'clues':list(research_dic_color.keys())[0], 'list':research_dic_color[list(research_dic_color.keys())[0]]})
+        self.nice_print(dico2ask)
 
     def possible_clues(self, imp_clues, ens):
         dico={}
@@ -689,7 +729,7 @@ class Cubes():
         self.cubes=cubes
         self.cube_dico={}
         self.counter=0
-        
+
 class Evenements():
     def __init__(self, tk):
         self.tk=tk
@@ -789,10 +829,11 @@ class DisplaySolve(Solve):
     def __init__(self):
         self.label=Label(tk,text='',bg="white",borderwidth=1)
         self.has_solved=False
-    def solve(self,event,elements,cubes,c,*args,**kwargs):
+    def solve(self,event,elements,cubes,circles,c,*args,**kwargs):
         ens=Ensembles(elements,c)
         coord=reponse.get()
         coord=tuple(map(int, coord.split(',')))
+        #print(coord)
         for elt in grid.elts2del:
                 if(isinstance(elt,list)):
                     for id in elt:
@@ -800,9 +841,9 @@ class DisplaySolve(Solve):
                 else:
                     grid.delete(elt)
         #display clue
-        if coord[1]==0:
+        if coord[0]==0:
             
-            for k in ens.ensembles[coord[0]]:
+            for k in ens.ensembles[coord[1]]:
                 q=k//18 #global positionning
                 r=k%18 #local positionning
                 if r==0:
@@ -815,14 +856,15 @@ class DisplaySolve(Solve):
         #solve and display
         else: 
             p=coord[0]
+            your_color=coord[2]
             s=Solve(ens.ensembles, p=p, clue=coord[1], **kwargs)
             s.solve()
-            if cubes != {}:
-                corr_res=self.correct_sol(s.res, ens.ensembles, cubes)
+            if len(cubes.cube_dico)>=2*p:
+                corr_res=self.correct_sol(s.res, ens.ensembles, cubes.cube_dico, cubes.cubes[your_color]['color'], circles.cube_dico)
             else:
                 corr_res=s.res
 
-            for cube in list(cubes.keys()):
+            for cube in list(cubes.cube_dico.keys()):
                 if cube in corr_res:
                     del corr_res[cube]
 
@@ -841,9 +883,9 @@ class DisplaySolve(Solve):
                 idx_glob=u.loc2glob(idx_loc[0],idx_loc[1],coord[0],coord[1],3,6)
                 grid.setCell(idx_glob[0],idx_glob[1],size=20,type='sol', fill='red', nolines=True)
             
-            imp_clues=self.impossible_clues(self.get_cubepos_bycolor(cubes), ens.ensembles)
-            r=Research(ens.ensembles, s.res, imp_clues, c_num=3)
-            r.dico2ask(self.get_cubepos_bycolor(cubes))
+            imp_clues=self.impossible_clues(self.get_cubepos_bycolor(cubes.cube_dico), self.get_cubepos_bycolor(circles.cube_dico), ens.ensembles)
+            r=Research(ens.ensembles, s.res, imp_clues)
+            r.dico2ask(self.get_cubepos_bycolor(cubes.cube_dico))
             #print(r.buffer_res)
     def get_cubepos_bycolor(self, cubes):
         dico={}
@@ -854,8 +896,9 @@ class DisplaySolve(Solve):
                 dico[v['color']]=[k]
         return dico
     ###impossible clues per color
-    def impossible_clues(self, cube_percol, ens):
+    def impossible_clues(self, cube_percol, circle_percol, ens):
         dico={}
+        #loop on cubes
         for color, elt_list in cube_percol.items():
             for elt in elt_list:
                 for clue,ensemble in ens.items():
@@ -866,32 +909,109 @@ class DisplaySolve(Solve):
                                 dico[color].sort()
                         else:
                             dico[color]=[clue]
+        #loop on circles
+        for color, elt_list in circle_percol.items():
+            for elt in elt_list:
+                for clue,ensemble in ens.items():
+                    if elt not in ensemble:
+                        if color in dico:
+                            if clue not in dico[color]:
+                                dico[color].append(clue)
+                                dico[color].sort()
+                        else:
+                            dico[color]=[clue]
+        return dico
+    ###possible clues per color
+    def possible_clues(self, imp_clues, ens):
+        dico={}
+        for color, clue_list in imp_clues.items():
+            for clue in list(ens.keys()):
+                if clue not in clue_list:
+                    if color in dico:
+                        dico[color].append(clue)
+                        dico[color].sort()
+                    else:
+                        dico[color]=[clue]
+                    
         return dico
     #do not use your own clue!!
-    def check_if_false(self, clue, imp_clues):
+    def check_if_false(self, clue, your_color, imp_clues):
         count=0
         for color, clue_list in imp_clues.items():
+            if color==your_color:
+                continue
             if clue in clue_list:
                 count+=1
         
         c=len(imp_clues)-count
-        if c==0:
+        if c==1:
             return True
         else:
             return False
-    def correct_sol(self, res, ens, cubes):
+    
+    #returns only exclusive elts of l1 compared to l2
+    def exclusion(self,l1,l2):
+        l=[]
+        for a in l1:
+            if a not in l2:
+                l.append(a)
+        return l
+    def exclusive_clues_percol(self, poss_clues, your_color):
+        dico={}
+        for color, clues in poss_clues.items():
+            l=clues
+            #print(l)
+            if your_color==color:
+                continue
+            for col, clu in poss_clues.items():
+                if your_color==color or col==color:
+                    continue
+                l=self.exclusion(l, clu)
+                #print(l)
+            dico[color]=l
+        return dico
+    #loop on poss_clues, return true if more than 1 clue of tupl is in same color
+    def check_redundancy(self, tupl, poss_clues, your_color):
+        for color, posclue in poss_clues.items():
+            count=0
+            #display only exclusive clues
+            posclue=self.exclusive_clues_percol(poss_clues, self.your_color)
+            for clue in posclue:
+                if clue in tupl:
+                    count+=1
+            if count>=2:
+                return True
+        
+        return False
+
+    def correct_sol(self, res, ens, cubes, your_color, circles):        
         cube_percol=self.get_cubepos_bycolor(cubes)
-        imp_clues=self.impossible_clues(cube_percol, ens)
+        circle_percol=self.get_cubepos_bycolor(circles)
+        imp_clues=self.impossible_clues(cube_percol, circle_percol, ens)
+        poss_clues=self.possible_clues(imp_clues, ens)
+        #remove by check if clue is false
         res_loop=res.copy()
         for sol, tupl_list in res_loop.items():
             tupl_list_loop=tupl_list.copy()
             for tupl in tupl_list_loop:
                 for clue in tupl:
-                    if self.check_if_false(clue, imp_clues):
+                    if self.check_if_false(clue, your_color, imp_clues):
                         if tupl in res[sol]:
                             res[sol].remove(tupl)
             if res[sol]==[]:
                 del res[sol]
+        
+        #remove if redundancy of clue in one color's possible clue list
+        res_loop=res.copy()
+        for sol, tupl_list in res_loop.items():
+            tupl_list_loop=tupl_list.copy()
+            for tupl in tupl_list_loop:
+                if self.check_redundancy(tupl,poss_clues,your_color):
+                    if tupl in res[sol]:
+                            res[sol].remove(tupl)
+            if res[sol]==[]:
+                del res[sol]
+
         return res
 
 
@@ -992,24 +1112,36 @@ if __name__ == "__main__":
     c=Connectivity()
     
     #user input to add cubes
-    orangecube={"shape":"cube", "color":"orange"}
-    redcube={"shape":"cube", "color":"red"}
-    cyancube={"shape":"cube", "color":"dark cyan"}
-    lbluecube={"shape":"cube", "color":"light blue"}
-    purplecube={"shape":"cube", "color":"purple"}
-    cubes=[orangecube,redcube,cyancube,lbluecube,purplecube]
-    cubes=Cubes(cubes)
+    orangecube={"shape":"cube", "color":"orange"}                 #0
+    redcube={"shape":"cube", "color":"red"}                       #1
+    cyancube={"shape":"cube", "color":"dark cyan"}                #2
+    lbluecube={"shape":"cube", "color":"light blue"}              #3
+    purplecube={"shape":"cube", "color":"purple"}                 #4
+    cubes_list=[orangecube,redcube,cyancube,lbluecube,purplecube]
+    cubes=Cubes(cubes_list)
     tk.bind('<Button-3>',lambda event:e.add_cubes(event,cubes))
 
     #get dico of cubes
     cubes_dico=cubes.cube_dico
 
+    #user input to add circles
+    orangecircle={"shape":"circle", "color":"orange"}                 #0
+    redcircle={"shape":"circle", "color":"red"}                       #1
+    cyancircle={"shape":"circle", "color":"dark cyan"}                #2
+    lbluecircle={"shape":"circle", "color":"light blue"}              #3
+    purplecircle={"shape":"circle", "color":"purple"}                 #4
+    circles_list=[orangecircle,redcircle,cyancircle,lbluecircle,purplecircle]
+    circles=Cubes(circles_list)
+    tk.bind('<Button-2>',lambda event:e.add_cubes(event,circles))
+
+    #get dico of circles
+    circles_dico=circles.cube_dico
+
     #user input solve or display one ensemble
     reponse = Entry(tk)
     reponse.grid(row=1, column=1, pady=5, padx=5)
     dsolve=DisplaySolve()
-    reponse.bind("<Return>", lambda event:dsolve.solve(event, elements, cubes_dico, c))
-
+    reponse.bind("<Return>", lambda event:dsolve.solve(event, elements, cubes, circles, c))
     
 
 
